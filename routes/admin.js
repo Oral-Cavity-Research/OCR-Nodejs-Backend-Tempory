@@ -89,14 +89,12 @@ router.post("/requests/:id", authenticateToken, async (req, res) => {
 
 // accept a requests
 router.post("/accept/:id", authenticateToken, async (req, res) => {
-
-  if(!checkPermissions(req.permissions, [100])){
-    return res.status(401).json({ message: "Unauthorized access"});
+  if (!checkPermissions(req.permissions, [100])) {
+    return res.status(401).json({ message: "Unauthorized access" });
   }
 
   try {
     const request = await Request.findById(req.params.id);
-
     if (request) {
       const regno = await User.findOne({ reg_no: request.reg_no });
       if (regno) {
@@ -109,13 +107,13 @@ router.post("/accept/:id", authenticateToken, async (req, res) => {
       }
 
       const newUser = new User({
-        username: req.body.username? req.body.username: request.username,
+        username: req.body.username ? req.body.username : request.username,
         email: request.email,
         reg_no: request.reg_no,
-        role: req.body.role,
+        role: req.body.role ? req.body.role : "System Admin",  // Provide a default role if not present
         hospital: request.hospital,
-        designation: request.designation ? req.body.designation : "",
-        contact_no: request.contact_no ? req.body.contact_no : "",
+        designation: req.body.designation ? req.body.designation : "",
+        contact_no: req.body.contact_no ? req.body.contact_no : "",
         availability: true
       });
 
@@ -123,7 +121,6 @@ router.post("/accept/:id", authenticateToken, async (req, res) => {
         const adduser = await newUser.save();
         const details = adduser._doc;
         await Request.findByIdAndDelete(req.params.id);
-
         emailService
           .sendEmail(request.email, "ACCEPT", req.body.reason, request.username)
           .then((response) => {
@@ -133,18 +130,21 @@ router.post("/accept/:id", authenticateToken, async (req, res) => {
           .catch((error) => {
             details["message"] =
               "User registration successful! Error: Email notification Failed. ";
-              res.status(200).json(details);
+            res.status(200).json(details);
           });
       } catch (error) {
-        return res.status(500).json({ message: "User registration failed" });
+        console.error("Error saving new user:", error);
+        return res.status(500).json({ message: "User registration failed", error });
       }
     } else {
       return res.status(404).json({ message: "Request not found" });
     }
   } catch (err) {
+    console.error("Error processing request:", err);
     return res.status(500).json({ error: err, message: "Internal Server Error!" });
   }
 });
+
 
 // get users by the roles
 // only for read or write access permissions
